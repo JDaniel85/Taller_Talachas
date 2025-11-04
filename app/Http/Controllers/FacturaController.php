@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Factura;
+use Barryvdh\DomPDF\Facade\Pdf;
 use App\Models\FacturaDetalle;
 use App\Models\Cliente;
 use App\Models\Servicio;
@@ -91,5 +92,18 @@ class FacturaController extends Controller
     {
         $factura->delete();
         return redirect()->route('facturas.index')->with('success','Factura eliminada.');
+    }
+
+    public function print(Factura $factura)
+    {
+        $factura->load('cliente','detalles.servicio','detalles.refaccion');
+        return view('facturas.show', compact('factura'));
+    }
+
+    public function download(Factura $factura)
+    {
+        $factura->load('cliente','detalles.servicio','detalles.refaccion');
+        $pdf = Pdf::loadView('facturas.pdf', compact('factura'));
+        return $pdf->download("Factura_TellerTalachas_{$factura->id}.pdf");
     }
 }

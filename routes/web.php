@@ -19,3 +19,6 @@ Route::resource('servicios', ServicioController::class);
 Route::resource('refacciones', RefaccionController::class);
 Route::resource('facturas', FacturaController::class)->except(['edit','update']);
 Route::get('facturas/{factura}/pdf', [FacturaController::class, 'generarPDF'])->name('facturas.pdf');
+Route::get('facturas/{factura}/print', [FacturaController::class, 'print'])->name('facturas.print');
+Route::get('facturas/{factura}/download', [FacturaController::class, 'download'])->name('facturas.download');
+

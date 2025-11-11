@@ -23,7 +23,7 @@
     </div>
     <div class="mb-3">
         <label>Teléfono</label>
-        <input type="number" name="telefono" class="form-control">
+        <input type="tel" name="telefono" maxlength="10" class="form-control">
     </div>
     <button class="btn btn-success">Guardar</button>
     <a href="{{ route('clientes.index') }}" class="btn btn-secondary">Cancelar</a>

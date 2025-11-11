@@ -28,59 +28,61 @@ class FacturaController extends Controller
     }
 
     public function store(Request $request)
-    {
-        $request->validate([
-            'cliente_id' => 'required|exists:clientes,id',
-            'items' => 'required|array|min:1'
+{
+    $request->validate([
+        'cliente_id' => 'required|exists:clientes,id',
+        'items_json' => 'required'  // ✅ Cambiamos esto
+    ], [
+        'items_json.required' => 'Debe agregar al menos un concepto a la factura.'
+    ]);
+
+    // ✅ Decode JSON de items
+    $items = json_decode($request->items_json, true);
+
+    if (!$items || count($items) === 0) {
+        return back()->withErrors(['items_json' => 'Debe agregar al menos un ítem.'])->withInput();
+    }
+
+    // 🔹 Cálculos
+    $subtotal = 0;
+
+    foreach ($items as $i) {
+        $subtotal += floatval($i['total']);
+    }
+
+    $impuestos = $subtotal * 0.16;
+    $total = $subtotal + $impuestos;
+
+    // ✅ Crear factura
+    $factura = Factura::create([
+        'cliente_id' => $request->cliente_id,
+        'subtotal'   => $subtotal,
+        'impuestos'  => $impuestos,
+        'total'      => $total,
+        'estatus'    => 'emitida',
+    ]);
+
+    // ✅ Insertar detalles
+    foreach ($items as $i) {
+        FacturaDetalle::create([
+            'factura_id' => $factura->id,
+            'servicio_id' => $i['tipo'] === 'servicio' ? $i['id'] : null,
+            'refaccion_id' => $i['tipo'] === 'refaccion' ? $i['id'] : null,
+            'cantidad' => $i['cantidad'],
+            'precio_unitario' => $i['precio_unitario'],
+            'total' => $i['total']
         ]);
 
-        DB::transaction(function () use ($request, &$factura) {
-            $factura = Factura::create([
-                'cliente_id' => $request->cliente_id,
-                'subtotal' => 0,
-                'impuestos' => 0,
-                'total' => 0
-            ]);
-
-            $subtotal = 0;
-            foreach ($request->items as $item) {
-                // validar que exista price y cantidad
-                $cantidad = isset($item['cantidad']) ? intval($item['cantidad']) : 1;
-                $precio_unitario = isset($item['precio_unitario']) ? floatval($item['precio_unitario']) : 0;
-                $totalItem = round($cantidad * $precio_unitario, 2);
-
-                FacturaDetalle::create([
-                    'factura_id' => $factura->id,
-                    'servicio_id' => $item['servicio_id'] ?? null,
-                    'refaccion_id' => $item['refaccion_id'] ?? null,
-                    'cantidad' => $cantidad,
-                    'precio_unitario' => $precio_unitario,
-                    'total' => $totalItem
-                ]);
-
-                // si es refacción, disminuir stock
-                if (!empty($item['refaccion_id'])) {
-                    $ref = Refaccion::find($item['refaccion_id']);
-                    if ($ref) {
-                        $ref->decrement('stock', $cantidad);
-                    }
-                }
-
-                $subtotal += $totalItem;
-            }
-
-            $impuestos = round($subtotal * 0.16, 2);
-            $total = round($subtotal + $impuestos, 2);
-
-            $factura->update([
-                'subtotal' => $subtotal,
-                'impuestos' => $impuestos,
-                'total' => $total
-            ]);
-        });
-
-        return redirect()->route('facturas.index')->with('success','Factura creada correctamente.');
+        // ✅ Reducir stock si es refacción
+        if ($i['tipo'] === 'refaccion') {
+            Refaccion::where('id', $i['id'])->decrement('stock', $i['cantidad']);
+        }
     }
+
+    return redirect()->route('facturas.show', $factura->id)
+        ->with('success', 'Factura generada correctamente ✅');
+}
+
 
     public function show(Factura $factura)
     {
